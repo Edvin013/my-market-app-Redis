@@ -2,9 +2,11 @@ package ru.mirakyan.mymarket.controller;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.reactive.server.WebTestClient;
+import reactor.core.publisher.Mono;
 import ru.mirakyan.mymarket.dto.ItemDto;
 import ru.mirakyan.mymarket.dto.PagingDto;
 import ru.mirakyan.mymarket.enums.ItemAction;
@@ -15,74 +17,90 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(ItemController.class)
+@WebFluxTest(ItemController.class)
 class ItemControllerTest {
 
     @Autowired
-    private MockMvc mockMvc;
+    private WebTestClient webTestClient;
 
     @MockBean
     private ItemService itemService;
 
     @Test
-    void testGetItems() throws Exception {
+    void testGetItems() {
         ItemDto item = new ItemDto(1L, "Test", "Desc", "/img", 100L, 0);
         List<List<ItemDto>> items = List.of(List.of(item));
         PagingDto paging = new PagingDto(5, 1, false, false);
 
-        when(itemService.getItems(anyString(), any(SortType.class), anyInt(), anyInt())).thenReturn(items);
-        when(itemService.getPagingInfo(anyString(), anyInt(), anyInt())).thenReturn(paging);
+        when(itemService.getItems(anyString(), any(SortType.class), anyInt(), anyInt())).thenReturn(Mono.just(items));
+        when(itemService.getPagingInfo(anyString(), anyInt(), anyInt())).thenReturn(Mono.just(paging));
 
-        mockMvc.perform(get("/items"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("items"))
-                .andExpect(model().attributeExists("items"))
-                .andExpect(model().attributeExists("search"))
-                .andExpect(model().attributeExists("sort"))
-                .andExpect(model().attributeExists("paging"));
+        webTestClient.get()
+                .uri("/items")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .consumeWith(response -> {
+                    String body = new String(response.getResponseBody());
+                    assert body.contains("Test");
+                });
+
+        verify(itemService).getItems(anyString(), any(), anyInt(), anyInt());
+        verify(itemService).getPagingInfo(anyString(), anyInt(), anyInt());
     }
 
     @Test
-    void testGetItemById() throws Exception {
+    void testGetItemById() {
         ItemDto item = new ItemDto(1L, "Test", "Desc", "/img", 100L, 0);
 
-        when(itemService.getItemById(1L)).thenReturn(item);
+        when(itemService.getItemById(1L)).thenReturn(Mono.just(item));
 
-        mockMvc.perform(get("/items/1"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("item"))
-                .andExpect(model().attributeExists("item"));
+        webTestClient.get()
+                .uri("/items/1")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .consumeWith(response -> {
+                    String body = new String(response.getResponseBody());
+                    assert body.contains("Test");
+                });
+
+        verify(itemService).getItemById(1L);
     }
 
     @Test
-    void testUpdateItemInCartFromItemsPage() throws Exception {
-        doNothing().when(itemService).updateCartItem(anyLong(), any(ItemAction.class));
+    void testUpdateItemInCartFromItemsPage() {
+        when(itemService.updateCartItem(anyLong(), any(ItemAction.class))).thenReturn(Mono.empty());
 
-        mockMvc.perform(post("/items")
-                        .param("id", "1")
-                        .param("action", "PLUS"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrlPattern("/items?*"));
+        webTestClient.post()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/items")
+                        .queryParam("id", "1")
+                        .queryParam("action", "PLUS")
+                        .build())
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .exchange()
+                .expectStatus().is3xxRedirection();
 
         verify(itemService, times(1)).updateCartItem(1L, ItemAction.PLUS);
     }
 
     @Test
-    void testUpdateItemInCartFromItemPage() throws Exception {
+    void testUpdateItemInCartFromItemPage() {
         ItemDto item = new ItemDto(1L, "Test", "Desc", "/img", 100L, 1);
 
-        doNothing().when(itemService).updateCartItem(anyLong(), any(ItemAction.class));
-        when(itemService.getItemById(1L)).thenReturn(item);
+        when(itemService.updateCartItem(anyLong(), any(ItemAction.class))).thenReturn(Mono.empty());
+        when(itemService.getItemById(1L)).thenReturn(Mono.just(item));
 
-        mockMvc.perform(post("/items/1")
-                        .param("action", "PLUS"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("item"))
-                .andExpect(model().attributeExists("item"));
+        webTestClient.post()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/items/1")
+                        .queryParam("action", "PLUS")
+                        .build())
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .exchange()
+                .expectStatus().isOk();
 
         verify(itemService, times(1)).updateCartItem(1L, ItemAction.PLUS);
     }

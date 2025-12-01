@@ -29,7 +29,7 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     public Mono<List<List<ItemDto>>> getItems(String search, SortType sort, int pageNumber, int pageSize) {
-        Flux<Item> itemsFlux = (!search.isEmpty())
+        Flux<Item> itemsFlux = (search != null && !search.isEmpty())
                 ? itemRepository.findByTitleOrDescriptionContaining(search)
                 : itemRepository.findAll();
 
