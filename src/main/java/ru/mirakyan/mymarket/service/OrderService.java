@@ -1,11 +1,11 @@
 package ru.mirakyan.mymarket.service;
 
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import ru.mirakyan.mymarket.dto.OrderDto;
 
-import java.util.List;
-
 public interface OrderService {
-    Long createOrder();
-    List<OrderDto> getAllOrders();
-    OrderDto getOrderById(Long id);
+    Mono<Long> createOrder();
+    Flux<OrderDto> getAllOrders();
+    Mono<OrderDto> getOrderById(Long id);
 }
