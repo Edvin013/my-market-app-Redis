@@ -4,10 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
-import ru.mirakyan.mymarket.dto.OrderDto;
+import reactor.core.publisher.Mono;
 import ru.mirakyan.mymarket.service.OrderService;
-
-import java.util.List;
 
 @Controller
 @RequiredArgsConstructor
@@ -15,29 +13,31 @@ public class OrderController {
     private final OrderService orderService;
 
     @GetMapping("/orders")
-    public String getAllOrders(Model model) {
-        List<OrderDto> orders = orderService.getAllOrders();
-        model.addAttribute("orders", orders);
-        return "orders";
+    public Mono<String> getAllOrders(Model model) {
+        return orderService.getAllOrders()
+                .collectList()
+                .doOnNext(orders -> model.addAttribute("orders", orders))
+                .thenReturn("orders");
     }
 
     @GetMapping("/orders/{id}")
-    public String getOrder(
+    public Mono<String> getOrder(
             @PathVariable Long id,
             @RequestParam(defaultValue = "false") boolean newOrder,
             Model model) {
 
-        OrderDto order = orderService.getOrderById(id);
-        model.addAttribute("order", order);
-        model.addAttribute("newOrder", newOrder);
-
-        return "order";
+        return orderService.getOrderById(id)
+                .doOnNext(order -> {
+                    model.addAttribute("order", order);
+                    model.addAttribute("newOrder", newOrder);
+                })
+                .thenReturn("order");
     }
 
     @PostMapping("/buy")
-    public String createOrder() {
-        Long orderId = orderService.createOrder();
-        return "redirect:/orders/" + orderId + "?newOrder=true";
+    public Mono<String> createOrder() {
+        return orderService.createOrder()
+                .map(orderId -> "redirect:/orders/" + orderId + "?newOrder=true");
     }
 }
 

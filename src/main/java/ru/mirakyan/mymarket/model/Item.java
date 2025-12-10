@@ -1,36 +1,31 @@
 package ru.mirakyan.mymarket.model;
 
-import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
 @Table(name = "items")
 @Getter
 @Setter
 @NoArgsConstructor
+@AllArgsConstructor
 public class Item {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column("title")
     private String title;
 
-    @Column(length = 1000)
+    @Column("description")
     private String description;
 
+    @Column("img_path")
     private String imgPath;
 
-    @Column(nullable = false)
+    @Column("price")
     private Long price;
-
-    public Item(Long id, String title, String description, String imgPath, Long price) {
-        this.id = id;
-        this.title = title;
-        this.description = description;
-        this.imgPath = imgPath;
-        this.price = price;
-    }
 }

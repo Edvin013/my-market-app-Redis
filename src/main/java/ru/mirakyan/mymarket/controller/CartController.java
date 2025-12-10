@@ -4,11 +4,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
-import ru.mirakyan.mymarket.dto.ItemDto;
+import reactor.core.publisher.Mono;
 import ru.mirakyan.mymarket.enums.ItemAction;
 import ru.mirakyan.mymarket.service.CartService;
-
-import java.util.List;
 
 @Controller
 @RequestMapping("/cart")
@@ -18,31 +16,31 @@ public class CartController {
     private final CartService cartService;
 
     @GetMapping("/items")
-    public String getCartItems(Model model) {
-        List<ItemDto> items = cartService.getCartItems();
-        Long total = cartService.getTotalPrice();
-
-        model.addAttribute("items", items);
-        model.addAttribute("total", total);
-
-        return "cart";
+    public Mono<String> getCartItems(Model model) {
+        return cartService.getCartItems()
+                .collectList()
+                .zipWith(cartService.getTotalPrice())
+                .doOnNext(tuple -> {
+                    model.addAttribute("items", tuple.getT1());
+                    model.addAttribute("total", tuple.getT2());
+                })
+                .thenReturn("cart");
     }
 
     @PostMapping("/items")
-    public String updateCartItem(
+    public Mono<String> updateCartItem(
             @RequestParam Long id,
             @RequestParam ItemAction action,
             Model model) {
 
-        cartService.updateCartItem(id, action);
-
-        List<ItemDto> items = cartService.getCartItems();
-        Long total = cartService.getTotalPrice();
-
-        model.addAttribute("items", items);
-        model.addAttribute("total", total);
-
-        return "cart";
+        return cartService.updateCartItem(id, action)
+                .then(cartService.getCartItems().collectList())
+                .zipWith(cartService.getTotalPrice())
+                .doOnNext(tuple -> {
+                    model.addAttribute("items", tuple.getT1());
+                    model.addAttribute("total", tuple.getT2());
+                })
+                .thenReturn("cart");
     }
 }
 

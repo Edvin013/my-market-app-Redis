@@ -1,29 +1,34 @@
 package ru.mirakyan.mymarket.model;
 
-import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
 @Table(name = "cart_items")
 @Getter
 @Setter
 @NoArgsConstructor
+@AllArgsConstructor
 public class CartItem {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
-    @JoinColumn(name = "item_id", nullable = false)
+    @Column("item_id")
+    private Long itemId;
+
+    @Transient
     private Item item;
 
-    @Column(nullable = false)
+    @Column("count")
     private Integer count;
 
-    public CartItem(Item item, Integer count) {
-        this.item = item;
+    public CartItem(Long itemId, Integer count) {
+        this.itemId = itemId;
         this.count = count;
     }
 }

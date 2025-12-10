@@ -2,7 +2,8 @@ package ru.mirakyan.mymarket.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import ru.mirakyan.mymarket.dto.ItemDto;
 import ru.mirakyan.mymarket.dto.OrderDto;
 import ru.mirakyan.mymarket.exception.EmptyCartException;
@@ -12,69 +13,87 @@ import ru.mirakyan.mymarket.model.CartItem;
 import ru.mirakyan.mymarket.model.Order;
 import ru.mirakyan.mymarket.model.OrderItem;
 import ru.mirakyan.mymarket.repository.CartItemRepository;
+import ru.mirakyan.mymarket.repository.ItemRepository;
+import ru.mirakyan.mymarket.repository.OrderItemRepository;
 import ru.mirakyan.mymarket.repository.OrderRepository;
 import ru.mirakyan.mymarket.service.CartService;
 import ru.mirakyan.mymarket.service.OrderService;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
     private final CartItemRepository cartItemRepository;
+    private final ItemRepository itemRepository;
     private final CartService cartService;
     private final ItemDtoMapper itemDtoMapper;
 
     @Override
-    @Transactional
-    public Long createOrder() {
-        List<CartItem> cartItems = cartItemRepository.findAll();
-        if (cartItems.isEmpty()) {
-            throw new EmptyCartException();
-        }
+    public Mono<Long> createOrder() {
+        return cartItemRepository.findAll()
+                .collectList()
+                .flatMap(cartItems -> {
+                    if (cartItems.isEmpty()) {
+                        return Mono.error(new EmptyCartException());
+                    }
 
-        Long totalSum = cartItems.stream()
-                .mapToLong(ci -> ci.getItem().getPrice() * ci.getCount())
-                .sum();
-
-        Order order = new Order(totalSum);
-        for (CartItem cartItem : cartItems) {
-            OrderItem orderItem = new OrderItem(
-                    cartItem.getItem(),
-                    cartItem.getCount(),
-                    cartItem.getItem().getPrice()
-            );
-            order.addItem(orderItem);
-        }
-
-        Order savedOrder = orderRepository.save(order);
-        cartService.clearCart();
-        return savedOrder.getId();
+                    return Flux.fromIterable(cartItems)
+                            .flatMap(cartItem ->
+                                itemRepository.findById(cartItem.getItemId())
+                                    .map(item -> item.getPrice() * cartItem.getCount())
+                            )
+                            .reduce(0L, Long::sum)
+                            .flatMap(totalSum -> {
+                                Order order = new Order(totalSum);
+                                return orderRepository.save(order)
+                                        .flatMap(savedOrder ->
+                                            Flux.fromIterable(cartItems)
+                                                .flatMap(cartItem ->
+                                                    itemRepository.findById(cartItem.getItemId())
+                                                        .map(item -> new OrderItem(
+                                                            null,
+                                                            savedOrder.getId(),
+                                                            item.getId(),
+                                                            null,
+                                                            cartItem.getCount(),
+                                                            item.getPrice()
+                                                        ))
+                                                )
+                                                .flatMap(orderItemRepository::save)
+                                                .then(cartService.clearCart())
+                                                .thenReturn(savedOrder.getId())
+                                        );
+                            });
+                });
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public List<OrderDto> getAllOrders() {
-        return orderRepository.findAll().stream()
-                .map(this::convertToDto)
-                .collect(Collectors.toList());
+    public Flux<OrderDto> getAllOrders() {
+        return orderRepository.findAll()
+                .flatMap(this::convertToDto);
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public OrderDto getOrderById(Long id) {
-        Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new OrderNotFoundException(id));
-        return convertToDto(order);
+    public Mono<OrderDto> getOrderById(Long id) {
+        return orderRepository.findById(id)
+                .switchIfEmpty(Mono.error(new OrderNotFoundException(id)))
+                .flatMap(this::convertToDto);
     }
 
-    private OrderDto convertToDto(Order order) {
-        List<ItemDto> itemDtos = order.getItems().stream()
-                .map(itemDtoMapper::fromOrderItem)
-                .collect(Collectors.toList());
-        return new OrderDto(order.getId(), itemDtos, order.getTotalSum());
+    private Mono<OrderDto> convertToDto(Order order) {
+        return orderItemRepository.findByOrderId(order.getId())
+                .flatMap(orderItem ->
+                    itemRepository.findById(orderItem.getItemId())
+                        .map(item -> {
+                            orderItem.setItem(item);
+                            return itemDtoMapper.fromOrderItem(orderItem);
+                        })
+                )
+                .collectList()
+                .map(itemDtos -> new OrderDto(order.getId(), itemDtos, order.getTotalSum()));
     }
 }
 

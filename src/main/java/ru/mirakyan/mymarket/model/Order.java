@@ -1,34 +1,33 @@
 package ru.mirakyan.mymarket.model;
 
-import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
+
 import java.util.ArrayList;
 import java.util.List;
 
-@Entity
 @Table(name = "orders")
 @Getter
 @Setter
 @NoArgsConstructor
+@AllArgsConstructor
 public class Order {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Transient
     private List<OrderItem> items = new ArrayList<>();
 
-    @Column(nullable = false)
+    @Column("total_sum")
     private Long totalSum;
 
     public Order(Long totalSum) {
         this.totalSum = totalSum;
-    }
-
-    public void addItem(OrderItem item) {
-        items.add(item);
-        item.setOrder(this);
     }
 }
