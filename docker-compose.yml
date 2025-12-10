@@ -16,20 +16,69 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-  app:
-    build: .
+    networks:
+      - market-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: market-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - market-network
+
+  payment-service:
+    build:
+      context: ./payment-service
+      dockerfile: Dockerfile
+    container_name: payment-service
+    environment:
+      SERVER_PORT: 8081
+      PAYMENT_INITIAL_BALANCE: 1000000
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8081/api/v1/payments/balance"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - market-network
+
+  market-app:
+    build:
+      context: ./market-app
+      dockerfile: Dockerfile
     container_name: my-market-app
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/marketdb
-      SPRING_DATASOURCE_USERNAME: market
-      SPRING_DATASOURCE_PASSWORD: market
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_R2DBC_URL: r2dbc:postgresql://postgres:5432/marketdb
+      SPRING_R2DBC_USERNAME: market
+      SPRING_R2DBC_PASSWORD: market
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      PAYMENT_SERVICE_URL: http://payment-service:8081
     ports:
       - "8080:8080"
     restart: unless-stopped
+    networks:
+      - market-network
+
 volumes:
   pgdata:
+
+networks:
+  market-network:
+    driver: bridge
 
