@@ -37,7 +37,6 @@ public class CartController {
                     model.addAttribute("balance", balance);
                     model.addAttribute("paymentServiceAvailable", paymentServiceAvailable);
 
-                    // Определяем, доступна ли кнопка оформления заказа
                     boolean canCheckout = paymentServiceAvailable && balance >= total;
                     model.addAttribute("canCheckout", canCheckout);
                 })
@@ -68,7 +67,6 @@ public class CartController {
                     model.addAttribute("balance", balance);
                     model.addAttribute("paymentServiceAvailable", paymentServiceAvailable);
 
-                    // Определяем, доступна ли кнопка оформления заказа
                     boolean canCheckout = paymentServiceAvailable && balance >= total;
                     model.addAttribute("canCheckout", canCheckout);
                 })

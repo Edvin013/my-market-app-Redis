@@ -4,12 +4,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import ru.mirakyan.mymarket.dto.ItemDto;
 import ru.mirakyan.mymarket.dto.OrderDto;
 import ru.mirakyan.mymarket.exception.EmptyCartException;
 import ru.mirakyan.mymarket.exception.OrderNotFoundException;
 import ru.mirakyan.mymarket.mapper.ItemDtoMapper;
-import ru.mirakyan.mymarket.model.CartItem;
 import ru.mirakyan.mymarket.model.Order;
 import ru.mirakyan.mymarket.model.OrderItem;
 import ru.mirakyan.mymarket.repository.CartItemRepository;
@@ -19,8 +17,6 @@ import ru.mirakyan.mymarket.repository.OrderRepository;
 import ru.mirakyan.mymarket.service.CartService;
 import ru.mirakyan.mymarket.service.OrderService;
 import ru.mirakyan.mymarket.service.PaymentClient;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -44,37 +40,35 @@ public class OrderServiceImpl implements OrderService {
 
                     return Flux.fromIterable(cartItems)
                             .flatMap(cartItem ->
-                                itemRepository.findById(cartItem.getItemId())
-                                    .map(item -> item.getPrice() * cartItem.getCount())
+                                    itemRepository.findById(cartItem.getItemId())
+                                            .map(item -> item.getPrice() * cartItem.getCount())
                             )
                             .reduce(0L, Long::sum)
                             .flatMap(totalSum -> {
-                                // Сначала обрабатываем платеж
                                 return paymentClient.processPayment(totalSum, null, "Оплата заказа")
                                         .flatMap(paymentSuccess -> {
                                             if (!paymentSuccess) {
                                                 return Mono.error(new RuntimeException("Не удалось обработать платеж. Недостаточно средств или сервис платежей недоступен."));
                                             }
 
-                                            // Если платеж успешен, создаем заказ
                                             Order order = new Order(totalSum);
                                             return orderRepository.save(order)
                                                     .flatMap(savedOrder ->
-                                                        Flux.fromIterable(cartItems)
-                                                            .flatMap(cartItem ->
-                                                                itemRepository.findById(cartItem.getItemId())
-                                                                    .map(item -> new OrderItem(
-                                                                        null,
-                                                                        savedOrder.getId(),
-                                                                        item.getId(),
-                                                                        null,
-                                                                        cartItem.getCount(),
-                                                                        item.getPrice()
-                                                                    ))
-                                                            )
-                                                            .flatMap(orderItemRepository::save)
-                                                            .then(cartService.clearCart())
-                                                            .thenReturn(savedOrder.getId())
+                                                            Flux.fromIterable(cartItems)
+                                                                    .flatMap(cartItem ->
+                                                                            itemRepository.findById(cartItem.getItemId())
+                                                                                    .map(item -> new OrderItem(
+                                                                                            null,
+                                                                                            savedOrder.getId(),
+                                                                                            item.getId(),
+                                                                                            null,
+                                                                                            cartItem.getCount(),
+                                                                                            item.getPrice()
+                                                                                    ))
+                                                                    )
+                                                                    .flatMap(orderItemRepository::save)
+                                                                    .then(cartService.clearCart())
+                                                                    .thenReturn(savedOrder.getId())
                                                     );
                                         });
                             });
@@ -97,11 +91,11 @@ public class OrderServiceImpl implements OrderService {
     private Mono<OrderDto> convertToDto(Order order) {
         return orderItemRepository.findByOrderId(order.getId())
                 .flatMap(orderItem ->
-                    itemRepository.findById(orderItem.getItemId())
-                        .map(item -> {
-                            orderItem.setItem(item);
-                            return itemDtoMapper.fromOrderItem(orderItem);
-                        })
+                        itemRepository.findById(orderItem.getItemId())
+                                .map(item -> {
+                                    orderItem.setItem(item);
+                                    return itemDtoMapper.fromOrderItem(orderItem);
+                                })
                 )
                 .collectList()
                 .map(itemDtos -> new OrderDto(order.getId(), itemDtos, order.getTotalSum()));

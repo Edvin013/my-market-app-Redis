@@ -31,14 +31,11 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     public Mono<List<List<ItemDto>>> getItems(String search, SortType sort, int pageNumber, int pageSize) {
-        // Пытаемся получить из кеша, если нет поиска
         Flux<Item> itemsFlux;
 
         if (search != null && !search.isEmpty()) {
-            // При поиске всегда идем в БД
             itemsFlux = itemRepository.findByTitleOrDescriptionContaining(search);
         } else {
-            // Пытаемся получить из кеша, если не найдено - из БД и сохраняем в кеш
             itemsFlux = itemCacheService.getAllItemsFromCache()
                     .switchIfEmpty(
                         itemRepository.findAll()
@@ -70,7 +67,6 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     public Mono<ItemDto> getItemById(Long id) {
-        // Пытаемся получить из кеша, если не найдено - из БД и сохраняем в кеш
         return itemCacheService.getItemFromCache(id)
                 .switchIfEmpty(
                     itemRepository.findById(id)

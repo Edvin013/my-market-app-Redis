@@ -44,7 +44,6 @@ public class PaymentServiceImpl implements PaymentService {
                 return new PaymentResult(false, null, currentBalance, "Недостаточно средств на балансе");
             }
 
-            // Атомарное списание средств
             long newBalance = balance.addAndGet(-amount);
             String transactionId = "txn_" + UUID.randomUUID();
 
