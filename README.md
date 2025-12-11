@@ -220,63 +220,6 @@ api-specs/payment-service-api.yaml
 
 Генерация происходит автоматически при сборке проекта через `openapi-generator-maven-plugin`.
 
-## Структура проекта
-
-```
-my-market-app-Redis/
-├── pom.xml                          # Родительский POM
-├── api-specs/
-│   └── payment-service-api.yaml     # OpenAPI спецификация
-├── market-app/                      # Основное приложение
-│   ├── pom.xml
-│   ├── Dockerfile
-│   └── src/
-│       ├── main/
-│       │   ├── java/
-│       │   │   └── ru/mirakyan/mymarket/
-│       │   │       ├── config/
-│       │   │       │   ├── RedisConfig.java
-│       │   │       │   └── PaymentClientConfig.java
-│       │   │       ├── service/
-│       │   │       │   ├── ItemCacheService.java
-│       │   │       │   ├── PaymentClient.java
-│       │   │       │   └── impl/
-│       │   │       └── ...
-│       │   └── resources/
-│       │       └── application.properties
-│       └── test/
-│           ├── java/
-│           │   └── ru/mirakyan/mymarket/
-│           │       ├── config/
-│           │       │   └── EmbeddedRedisConfig.java
-│           │       └── service/
-│           │           ├── ItemCacheServiceIntegrationTest.java
-│           │           └── PaymentClientIntegrationTest.java
-│           └── resources/
-│               └── application.properties
-├── payment-service/                 # Сервис платежей
-│   ├── pom.xml
-│   ├── Dockerfile
-│   └── src/
-│       ├── main/
-│       │   ├── java/
-│       │   │   └── ru/mirakyan/mymarket/payment/
-│       │   │       ├── PaymentServiceApplication.java
-│       │   │       ├── controller/
-│       │   │       │   └── PaymentApiDelegateImpl.java
-│       │   │       └── service/
-│       │   │           ├── PaymentService.java
-│       │   │           └── PaymentServiceImpl.java
-│       │   └── resources/
-│       │       └── application.properties
-│       └── test/
-│           └── java/
-│               └── ru/mirakyan/mymarket/payment/
-│                   └── service/
-│                       └── PaymentServiceTest.java
-└── docker-compose.yml
-```
-
 ## База данных
 - **Production**: PostgreSQL с реактивным драйвером R2DBC
 - **Tests**: H2 in-memory с реактивным драйвером R2DBC
@@ -314,72 +257,6 @@ server.port=8081
 payment.initial-balance=1000000
 ```
 
-## Тестирование
-
-### Покрытие тестами
-
-**Market App:**
-- Юнит-тесты сервисов
-- Интеграционные тесты контроллеров
-- **Интеграционные тесты кеширования** (ItemCacheServiceIntegrationTest)
-- **Интеграционные тесты Payment Client** (PaymentClientIntegrationTest)
-
-**Payment Service:**
-- Юнит-тесты сервисов (PaymentServiceTest)
-- Интеграционные тесты контроллеров
-
-### Особенности тестов
-
-- Используется **контекстное кеширование** Spring Boot Test для ускорения выполнения
-- Embedded Redis для изоляции тестов кеширования
-- MockWebServer для тестирования HTTP интеграций
-- StepVerifier для верификации реактивных потоков
-
-## Производительность
-
-### Преимущества использования Redis
-- **Снижение нагрузки на БД**: Часто запрашиваемые товары берутся из кеша
-- **Ускорение ответа**: Redis работает в памяти, что значительно быстрее БД
-- **Масштабируемость**: При росте трафика кеш помогает обрабатывать больше запросов
-
-### Метрики
-- TTL кеша: 120 секунд (настраивается)
-- Cache Hit Rate: зависит от паттернов использования
-- Время ответа из кеша: ~1-5 мс
-- Время ответа из БД: ~10-50 мс
-
-## Особенности реактивной версии
-- Все операции с базой данных неблокирующие (non-blocking)
-- Все операции с Redis неблокирующие
-- HTTP запросы в Payment Service неблокирующие
-- Используется Netty вместо Tomcat как встроенный веб-сервер
-- Контроллеры возвращают `Mono` и `Flux` для асинхронной обработки
-- Тесты используют `StepVerifier` для верификации реактивных потоков
-
-## Логирование
-
-Уровни логирования настраиваются в `application.properties`:
-```properties
-logging.level.ru.mirakyan.mymarket=DEBUG
-logging.level.org.springframework.web=INFO
-```
-
-Логируются:
-- Операции кеширования (cache HIT/MISS)
-- Запросы к Payment Service
-- Обработка платежей
-- Ошибки и исключения
-
-## Troubleshooting
-
-### Redis недоступен
-Если Redis недоступен, приложение продолжит работать, но товары будут загружаться только из БД.
-
-### Payment Service недоступен
-Если Payment Service недоступен:
-- Баланс отображается как 0
-- Кнопка оформления заказа недоступна
-- Показывается сообщение о недоступности сервиса
 
 ### Проблемы с портами
 Убедитесь, что порты не заняты:
@@ -388,9 +265,4 @@ logging.level.org.springframework.web=INFO
 - 5432 - PostgreSQL
 - 6379 - Redis
 
-## Авторы
-Market App Team
-
-## Лицензия
-MIT License
 
