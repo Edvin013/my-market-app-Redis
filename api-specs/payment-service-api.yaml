@@ -1,0 +1,149 @@
+openapi: 3.0.3
+info:
+  title: Payment Service API
+  description: RESTful API для обработки платежей интернет-магазина
+  version: 1.0.0
+  contact:
+    name: Market App Team
+
+servers:
+  - url: http://localhost:8081
+    description: Payment Service
+
+tags:
+  - name: payment
+    description: Операции с платежами
+
+paths:
+  /api/v1/payments/balance:
+    get:
+      tags:
+        - payment
+      summary: Получить текущий баланс
+      description: Возвращает текущий баланс на счёте пользователя
+      operationId: getBalance
+      responses:
+        '200':
+          description: Баланс успешно получен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/payments/process:
+    post:
+      tags:
+        - payment
+      summary: Обработать платеж
+      description: Обрабатывает платеж, списывая указанную сумму с баланса
+      operationId: processPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+      responses:
+        '200':
+          description: Платеж успешно обработан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Недостаточно средств или неверные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    BalanceResponse:
+      type: object
+      required:
+        - balance
+      properties:
+        balance:
+          type: integer
+          format: int64
+          description: Текущий баланс в копейках
+          example: 100000
+
+    PaymentRequest:
+      type: object
+      required:
+        - amount
+        - orderId
+      properties:
+        amount:
+          type: integer
+          format: int64
+          description: Сумма платежа в копейках
+          example: 5000
+        orderId:
+          type: integer
+          format: int64
+          description: Идентификатор заказа
+          example: 123
+        description:
+          type: string
+          description: Описание платежа
+          example: "Оплата заказа #123"
+
+    PaymentResponse:
+      type: object
+      required:
+        - success
+        - transactionId
+        - remainingBalance
+      properties:
+        success:
+          type: boolean
+          description: Успешность операции
+          example: true
+        transactionId:
+          type: string
+          description: Идентификатор транзакции
+          example: "txn_1234567890"
+        remainingBalance:
+          type: integer
+          format: int64
+          description: Остаток на балансе после операции в копейках
+          example: 95000
+        message:
+          type: string
+          description: Сообщение о результате операции
+          example: "Платеж успешно обработан"
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Тип ошибки
+          example: "INSUFFICIENT_FUNDS"
+        message:
+          type: string
+          description: Описание ошибки
+          example: "Недостаточно средств для выполнения операции"
+        timestamp:
+          type: string
+          format: date-time
+          description: Время возникновения ошибки
+
