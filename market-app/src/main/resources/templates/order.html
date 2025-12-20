@@ -21,9 +21,15 @@
                 <h2>
                     <span class="badge text-bg-success">Витрина магазина</span>
                 </h2>
-                <a href="/orders" class="btn btn-secondary ms-auto bi bi-file-earmark-text"> Заказы</a>
+                <a href="/items" class="btn btn-secondary ms-auto bi bi-arrow-left-square"> Главная</a>
+                <span class="text-muted">
+                    <i class="bi bi-person-circle"></i> <span th:text="${username}"></span>
+                </span>
+                <a href="/orders" class="btn btn-secondary bi bi-file-earmark-text"> Заказы</a>
                 <a href="/cart/items" class="btn btn-secondary bi bi-cart4"> Корзина</a>
-                <a href="/items" class="btn btn-secondary bi bi-arrow-left-square"> Главная</a>
+                <form method="post" action="/logout" style="margin: 0;">
+                    <button type="submit" class="btn btn-outline-danger bi bi-box-arrow-right"> Выйти</button>
+                </form>
             </div>
         </div>
     </div>

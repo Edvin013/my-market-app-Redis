@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import ru.mirakyan.mymarket.enums.ItemAction;
 import ru.mirakyan.mymarket.enums.SortType;
+import ru.mirakyan.mymarket.security.SecurityUtils;
 import ru.mirakyan.mymarket.service.ItemService;
 
 @Controller
@@ -24,11 +25,16 @@ public class ItemController {
 
         return itemService.getItems(search, sort, pageNumber, pageSize)
                 .zipWith(itemService.getPagingInfo(search, pageNumber, pageSize))
+                .zipWith(SecurityUtils.isAuthenticated())
+                .zipWith(SecurityUtils.getCurrentUsername().defaultIfEmpty(""))
                 .doOnNext(tuple -> {
-                    model.addAttribute("items", tuple.getT1());
+                    var itemsAndPaging = tuple.getT1().getT1();
+                    model.addAttribute("items", itemsAndPaging.getT1());
                     model.addAttribute("search", search);
                     model.addAttribute("sort", sort);
-                    model.addAttribute("paging", tuple.getT2());
+                    model.addAttribute("paging", itemsAndPaging.getT2());
+                    model.addAttribute("isAuthenticated", tuple.getT1().getT2());
+                    model.addAttribute("username", tuple.getT2());
                 })
                 .thenReturn("items");
     }
@@ -58,7 +64,13 @@ public class ItemController {
     @GetMapping("/items/{id}")
     public Mono<String> getItem(@PathVariable Long id, Model model) {
         return itemService.getItemById(id)
-                .doOnNext(item -> model.addAttribute("item", item))
+                .zipWith(SecurityUtils.isAuthenticated())
+                .zipWith(SecurityUtils.getCurrentUsername().defaultIfEmpty(""))
+                .doOnNext(tuple -> {
+                    model.addAttribute("item", tuple.getT1().getT1());
+                    model.addAttribute("isAuthenticated", tuple.getT1().getT2());
+                    model.addAttribute("username", tuple.getT2());
+                })
                 .thenReturn("item");
     }
 

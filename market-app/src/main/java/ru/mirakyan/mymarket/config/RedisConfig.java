@@ -1,10 +1,12 @@
 package ru.mirakyan.mymarket.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
@@ -22,6 +24,7 @@ public class RedisConfig {
     private int redisPort;
 
     @Bean
+    @Primary
     public ReactiveRedisConnectionFactory reactiveRedisConnectionFactory() {
         LettuceConnectionFactory connectionFactory = new LettuceConnectionFactory(redisHost, redisPort);
         connectionFactory.afterPropertiesSet();
@@ -34,6 +37,12 @@ public class RedisConfig {
 
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
+        
+        // Включаем сохранение информации о типе для правильной десериализации
+        BasicPolymorphicTypeValidator typeValidator = BasicPolymorphicTypeValidator.builder()
+                .allowIfBaseType(Object.class)
+                .build();
+        objectMapper.activateDefaultTyping(typeValidator, ObjectMapper.DefaultTyping.NON_FINAL);
 
         Jackson2JsonRedisSerializer<Object> serializer =
             new Jackson2JsonRedisSerializer<>(objectMapper, Object.class);

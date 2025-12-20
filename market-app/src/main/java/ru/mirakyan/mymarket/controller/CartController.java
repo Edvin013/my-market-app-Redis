@@ -6,6 +6,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import ru.mirakyan.mymarket.enums.ItemAction;
+import ru.mirakyan.mymarket.security.SecurityUtils;
 import ru.mirakyan.mymarket.service.CartService;
 import ru.mirakyan.mymarket.service.PaymentClient;
 
@@ -24,18 +25,22 @@ public class CartController {
                 .zipWith(cartService.getTotalPrice())
                 .zipWith(paymentClient.getBalance())
                 .zipWith(paymentClient.isServiceAvailable())
+                .zipWith(SecurityUtils.getCurrentUsername().defaultIfEmpty(""))
                 .doOnNext(tuple -> {
-                    var itemsAndTotalAndBalance = tuple.getT1();
+                    var itemsAndTotalAndBalanceAndService = tuple.getT1();
+                    var itemsAndTotalAndBalance = itemsAndTotalAndBalanceAndService.getT1();
                     var itemsAndTotal = itemsAndTotalAndBalance.getT1();
                     var items = itemsAndTotal.getT1();
                     var total = itemsAndTotal.getT2();
                     var balance = itemsAndTotalAndBalance.getT2();
-                    var paymentServiceAvailable = tuple.getT2();
+                    var paymentServiceAvailable = itemsAndTotalAndBalanceAndService.getT2();
+                    var username = tuple.getT2();
 
                     model.addAttribute("items", items);
                     model.addAttribute("total", total);
                     model.addAttribute("balance", balance);
                     model.addAttribute("paymentServiceAvailable", paymentServiceAvailable);
+                    model.addAttribute("username", username);
 
                     boolean canCheckout = paymentServiceAvailable && balance >= total;
                     model.addAttribute("canCheckout", canCheckout);

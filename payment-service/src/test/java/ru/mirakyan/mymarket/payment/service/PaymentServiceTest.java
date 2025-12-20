@@ -11,6 +11,7 @@ class PaymentServiceTest {
 
     private PaymentServiceImpl paymentService;
     private static final Long INITIAL_BALANCE = 100000L;
+    private static final String TEST_USER = "testuser";
 
     @BeforeEach
     void setUp() {
@@ -19,7 +20,7 @@ class PaymentServiceTest {
 
     @Test
     void shouldReturnInitialBalance() {
-        StepVerifier.create(paymentService.getBalance())
+        StepVerifier.create(paymentService.getBalance(TEST_USER))
                 .assertNext(balance -> assertThat(balance).isEqualTo(INITIAL_BALANCE))
                 .verifyComplete();
     }
@@ -30,7 +31,7 @@ class PaymentServiceTest {
         Long orderId = 123L;
         String description = "Test payment";
 
-        StepVerifier.create(paymentService.processPayment(amount, orderId, description))
+        StepVerifier.create(paymentService.processPayment(TEST_USER, amount, orderId, description))
                 .assertNext(result -> {
                     assertThat(result.isSuccess()).isTrue();
                     assertThat(result.getTransactionId()).isNotNull();
@@ -46,7 +47,7 @@ class PaymentServiceTest {
         Long orderId = 456L;
         String description = "Test payment";
 
-        StepVerifier.create(paymentService.processPayment(amount, orderId, description))
+        StepVerifier.create(paymentService.processPayment(TEST_USER, amount, orderId, description))
                 .assertNext(result -> {
                     assertThat(result.isSuccess()).isFalse();
                     assertThat(result.getTransactionId()).isNull();
@@ -62,7 +63,7 @@ class PaymentServiceTest {
         Long orderId = 789L;
         String description = "Test payment";
 
-        StepVerifier.create(paymentService.processPayment(amount, orderId, description))
+        StepVerifier.create(paymentService.processPayment(TEST_USER, amount, orderId, description))
                 .assertNext(result -> {
                     assertThat(result.isSuccess()).isFalse();
                     assertThat(result.getMessage()).contains("Неверная");
@@ -75,9 +76,9 @@ class PaymentServiceTest {
         Long amount = 3000L;
         Long orderId = 111L;
 
-        paymentService.processPayment(amount, orderId, "Payment 1").block();
+        paymentService.processPayment(TEST_USER, amount, orderId, "Payment 1").block();
 
-        StepVerifier.create(paymentService.getBalance())
+        StepVerifier.create(paymentService.getBalance(TEST_USER))
                 .assertNext(balance -> assertThat(balance).isEqualTo(INITIAL_BALANCE - amount))
                 .verifyComplete();
     }
@@ -87,10 +88,10 @@ class PaymentServiceTest {
         Long amount1 = 1000L;
         Long amount2 = 2000L;
 
-        paymentService.processPayment(amount1, 1L, "Payment 1").block();
-        paymentService.processPayment(amount2, 2L, "Payment 2").block();
+        paymentService.processPayment(TEST_USER, amount1, 1L, "Payment 1").block();
+        paymentService.processPayment(TEST_USER, amount2, 2L, "Payment 2").block();
 
-        StepVerifier.create(paymentService.getBalance())
+        StepVerifier.create(paymentService.getBalance(TEST_USER))
                 .assertNext(balance -> assertThat(balance).isEqualTo(INITIAL_BALANCE - amount1 - amount2))
                 .verifyComplete();
     }

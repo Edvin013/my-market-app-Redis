@@ -5,6 +5,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
+import ru.mirakyan.mymarket.security.SecurityUtils;
 import ru.mirakyan.mymarket.service.OrderService;
 
 @Controller
@@ -16,7 +17,11 @@ public class OrderController {
     public Mono<String> getAllOrders(Model model) {
         return orderService.getAllOrders()
                 .collectList()
-                .doOnNext(orders -> model.addAttribute("orders", orders))
+                .zipWith(SecurityUtils.getCurrentUsername().defaultIfEmpty(""))
+                .doOnNext(tuple -> {
+                    model.addAttribute("orders", tuple.getT1());
+                    model.addAttribute("username", tuple.getT2());
+                })
                 .thenReturn("orders");
     }
 
@@ -27,9 +32,11 @@ public class OrderController {
             Model model) {
 
         return orderService.getOrderById(id)
-                .doOnNext(order -> {
-                    model.addAttribute("order", order);
+                .zipWith(SecurityUtils.getCurrentUsername().defaultIfEmpty(""))
+                .doOnNext(tuple -> {
+                    model.addAttribute("order", tuple.getT1());
                     model.addAttribute("newOrder", newOrder);
+                    model.addAttribute("username", tuple.getT2());
                 })
                 .thenReturn("order");
     }

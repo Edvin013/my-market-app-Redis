@@ -16,9 +16,16 @@
                     <h2>
                         <span class="badge text-bg-success">Витрина магазина</span>
                     </h2>
-                    <a href="/orders" class="btn btn-secondary ms-auto bi bi-file-earmark-text"> Заказы</a>
-                    <a href="/cart/items" class="btn btn-secondary bi bi-cart4"> Корзина</a>
-                    <a href="/items" class="btn btn-secondary bi bi-arrow-left-square"> Главная</a>
+                    <a href="/items" class="btn btn-secondary ms-auto bi bi-arrow-left-square"> Главная</a>
+                    <span th:if="${isAuthenticated}" class="text-muted">
+                        <i class="bi bi-person-circle"></i> <span th:text="${username}"></span>
+                    </span>
+                    <a th:if="${isAuthenticated}" href="/orders" class="btn btn-secondary bi bi-file-earmark-text"> Заказы</a>
+                    <a th:if="${isAuthenticated}" href="/cart/items" class="btn btn-secondary bi bi-cart4"> Корзина</a>
+                    <a th:if="${!isAuthenticated}" href="/login" class="btn btn-primary bi bi-box-arrow-in-right"> Войти</a>
+                    <form th:if="${isAuthenticated}" method="post" action="/logout" style="margin: 0;">
+                        <button type="submit" class="btn btn-outline-danger bi bi-box-arrow-right"> Выйти</button>
+                    </form>
                 </div>
             </div>
         </div>
@@ -32,7 +39,7 @@
                             <span class="badge text-bg-success justify-content-end" th:text="${item.price}+' руб.'"></span>
                         </h5>
                         <p class="card-text" th:text="${item.description}"></p>
-                        <form th:action="@{${'/items/'+item.id}}" method="post">
+                        <form th:if="${isAuthenticated}" th:action="@{${'/items/'+item.id}}" method="post">
                             <div class="hstack gap-3">
                                 <button type="submit" class="btn btn-outline-secondary" name="action" value="MINUS">-</button>
                                 <span th:text="${item.count}"></span>
@@ -40,6 +47,9 @@
                                 <button type="submit" class="btn btn-warning ms-auto bi bi-cart4" name="action" value="PLUS" th:if="${item.count==0}"></button>
                             </div>
                         </form>
+                        <div th:unless="${isAuthenticated}" class="text-center">
+                            <a href="/login" class="btn btn-primary">Войдите для покупки</a>
+                        </div>
                     </div>
                 </div>
             </div>
