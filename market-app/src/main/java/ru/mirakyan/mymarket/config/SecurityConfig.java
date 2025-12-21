@@ -16,6 +16,8 @@ import ru.mirakyan.mymarket.security.UserDetailsServiceImpl;
 
 import java.net.URI;
 
+import static org.springframework.http.HttpMethod.*;
+
 @Configuration
 @EnableWebFluxSecurity
 @RequiredArgsConstructor
@@ -27,8 +29,8 @@ public class SecurityConfig {
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
         return http
                 .authorizeExchange(exchange -> exchange
-                        .pathMatchers(org.springframework.http.HttpMethod.GET, "/", "/items", "/items/**").permitAll()
-                        .pathMatchers(org.springframework.http.HttpMethod.POST, "/items", "/items/**").authenticated()
+                        .pathMatchers(GET, "/", "/items", "/items/**").permitAll()
+                        .pathMatchers(POST, "/items", "/items/**").authenticated()
                         .pathMatchers("/login", "/logout").permitAll()
                         .pathMatchers("/cart/**", "/orders/**", "/buy").authenticated()
                         .anyExchange().authenticated()
