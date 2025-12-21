@@ -15,11 +15,9 @@ public class SecurityConfig {
         return http
                 .authorizeExchange(exchange -> exchange
                         .pathMatchers("/api/v1/payments/**").authenticated()
-                        .anyExchange().permitAll()
+                        .anyExchange().authenticated()
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> {})
-                )
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}))
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .build();
     }

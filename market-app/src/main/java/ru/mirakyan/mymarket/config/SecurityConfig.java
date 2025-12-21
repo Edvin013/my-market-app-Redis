@@ -27,7 +27,8 @@ public class SecurityConfig {
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
         return http
                 .authorizeExchange(exchange -> exchange
-                        .pathMatchers("/", "/items", "/items/**").permitAll()
+                        .pathMatchers(org.springframework.http.HttpMethod.GET, "/", "/items", "/items/**").permitAll()
+                        .pathMatchers(org.springframework.http.HttpMethod.POST, "/items", "/items/**").authenticated()
                         .pathMatchers("/login", "/logout").permitAll()
                         .pathMatchers("/cart/**", "/orders/**", "/buy").authenticated()
                         .anyExchange().authenticated()

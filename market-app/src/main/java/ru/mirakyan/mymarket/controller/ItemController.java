@@ -1,9 +1,12 @@
 package ru.mirakyan.mymarket.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import ru.mirakyan.mymarket.enums.ItemAction;
 import ru.mirakyan.mymarket.enums.SortType;
@@ -39,26 +42,28 @@ public class ItemController {
                 .thenReturn("items");
     }
 
-    @PostMapping("/items")
-    public Mono<String> updateCartFromItems(
-            @RequestParam Long id,
-            @RequestParam ItemAction action,
-            @RequestParam(required = false) String search,
-            @RequestParam(defaultValue = "NO") SortType sort,
-            @RequestParam(defaultValue = "1") int pageNumber,
-            @RequestParam(defaultValue = "5") int pageSize) {
+    @PostMapping(value = "/items", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    public Mono<String> updateCartFromItems(ServerWebExchange exchange) {
+        return exchange.getFormData().flatMap(formData -> {
+            Long id = Long.parseLong(formData.getFirst("id"));
+            ItemAction action = ItemAction.valueOf(formData.getFirst("action"));
+            String search = formData.getFirst("search");
+            SortType sort = SortType.valueOf(formData.getOrDefault("sort", java.util.List.of("NO")).get(0));
+            int pageNumber = Integer.parseInt(formData.getOrDefault("pageNumber", java.util.List.of("1")).get(0));
+            int pageSize = Integer.parseInt(formData.getOrDefault("pageSize", java.util.List.of("5")).get(0));
 
-        return itemService.updateCartItem(id, action)
-                .then(Mono.fromCallable(() -> {
-                    StringBuilder redirectUrl = new StringBuilder("redirect:/items?");
-                    if (search != null && !search.isEmpty()) {
-                        redirectUrl.append("search=").append(search).append("&");
-                    }
-                    redirectUrl.append("sort=").append(sort)
-                               .append("&pageNumber=").append(pageNumber)
-                               .append("&pageSize=").append(pageSize);
-                    return redirectUrl.toString();
-                }));
+            return itemService.updateCartItem(id, action)
+                    .then(Mono.fromCallable(() -> {
+                        StringBuilder redirectUrl = new StringBuilder("redirect:/items?");
+                        if (search != null && !search.isEmpty()) {
+                            redirectUrl.append("search=").append(search).append("&");
+                        }
+                        redirectUrl.append("sort=").append(sort)
+                                   .append("&pageNumber=").append(pageNumber)
+                                   .append("&pageSize=").append(pageSize);
+                        return redirectUrl.toString();
+                    }));
+        });
     }
 
     @GetMapping("/items/{id}")
@@ -74,15 +79,18 @@ public class ItemController {
                 .thenReturn("item");
     }
 
-    @PostMapping("/items/{id}")
+    @PostMapping(value = "/items/{id}", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public Mono<String> updateCartFromItem(
             @PathVariable Long id,
-            @RequestParam ItemAction action,
+            ServerWebExchange exchange,
             Model model) {
 
-        return itemService.updateCartItem(id, action)
-                .then(itemService.getItemById(id))
-                .doOnNext(item -> model.addAttribute("item", item))
-                .thenReturn("item");
+        return exchange.getFormData().flatMap(formData -> {
+            ItemAction action = ItemAction.valueOf(formData.getFirst("action"));
+            return itemService.updateCartItem(id, action)
+                    .then(itemService.getItemById(id))
+                    .doOnNext(item -> model.addAttribute("item", item))
+                    .thenReturn("item");
+        });
     }
 }

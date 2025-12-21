@@ -141,6 +141,7 @@
                 </executions>
             </plugin>
 
+            <!-- build-helper-maven-plugin для добавления сгенерированных источников -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>build-helper-maven-plugin</artifactId>

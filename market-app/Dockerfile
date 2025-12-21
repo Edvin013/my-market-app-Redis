@@ -1,16 +1,13 @@
-# Build stage
-FROM eclipse-temurin:21-jdk-alpine AS builder
-WORKDIR /build
-
-# Copy entire project
-COPY . .
-
-# Build the application
-RUN ./mvnw clean package -pl market-app -DskipTests
-
-# Runtime stage
 FROM eclipse-temurin:21-jre-alpine
+
 WORKDIR /app
-COPY --from=builder /build/market-app/target/market-app-*.jar app.jar
+
+# Копируем JAR файл
+COPY market-app/target/market-app-*.jar app.jar
+
+# Открываем порт 8080
 EXPOSE 8080
+
+# Запускаем приложение
 ENTRYPOINT ["java", "-jar", "app.jar"]
+

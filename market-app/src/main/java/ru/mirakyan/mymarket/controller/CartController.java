@@ -1,9 +1,11 @@
 package ru.mirakyan.mymarket.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import ru.mirakyan.mymarket.enums.ItemAction;
 import ru.mirakyan.mymarket.security.SecurityUtils;
@@ -48,34 +50,35 @@ public class CartController {
                 .thenReturn("cart");
     }
 
-    @PostMapping("/items")
-    public Mono<String> updateCartItem(
-            @RequestParam Long id,
-            @RequestParam ItemAction action,
-            Model model) {
+    @PostMapping(value = "/items", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    public Mono<String> updateCartItem(ServerWebExchange exchange, Model model) {
+        return exchange.getFormData().flatMap(formData -> {
+            Long id = Long.parseLong(formData.getFirst("id"));
+            ItemAction action = ItemAction.valueOf(formData.getFirst("action"));
 
-        return cartService.updateCartItem(id, action)
-                .then(cartService.getCartItems().collectList())
-                .zipWith(cartService.getTotalPrice())
-                .zipWith(paymentClient.getBalance())
-                .zipWith(paymentClient.isServiceAvailable())
-                .doOnNext(tuple -> {
-                    var itemsAndTotalAndBalance = tuple.getT1();
-                    var itemsAndTotal = itemsAndTotalAndBalance.getT1();
-                    var items = itemsAndTotal.getT1();
-                    var total = itemsAndTotal.getT2();
-                    var balance = itemsAndTotalAndBalance.getT2();
-                    var paymentServiceAvailable = tuple.getT2();
+            return cartService.updateCartItem(id, action)
+                    .then(cartService.getCartItems().collectList())
+                    .zipWith(cartService.getTotalPrice())
+                    .zipWith(paymentClient.getBalance())
+                    .zipWith(paymentClient.isServiceAvailable())
+                    .doOnNext(tuple -> {
+                        var itemsAndTotalAndBalance = tuple.getT1();
+                        var itemsAndTotal = itemsAndTotalAndBalance.getT1();
+                        var items = itemsAndTotal.getT1();
+                        var total = itemsAndTotal.getT2();
+                        var balance = itemsAndTotalAndBalance.getT2();
+                        var paymentServiceAvailable = tuple.getT2();
 
-                    model.addAttribute("items", items);
-                    model.addAttribute("total", total);
-                    model.addAttribute("balance", balance);
-                    model.addAttribute("paymentServiceAvailable", paymentServiceAvailable);
+                        model.addAttribute("items", items);
+                        model.addAttribute("total", total);
+                        model.addAttribute("balance", balance);
+                        model.addAttribute("paymentServiceAvailable", paymentServiceAvailable);
 
-                    boolean canCheckout = paymentServiceAvailable && balance >= total;
-                    model.addAttribute("canCheckout", canCheckout);
-                })
-                .thenReturn("cart");
+                        boolean canCheckout = paymentServiceAvailable && balance >= total;
+                        model.addAttribute("canCheckout", canCheckout);
+                    })
+                    .thenReturn("cart");
+        });
     }
 }
 

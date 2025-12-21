@@ -1,6 +1,7 @@
 package ru.mirakyan.mymarket.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -41,7 +42,7 @@ public class OrderController {
                 .thenReturn("order");
     }
 
-    @PostMapping("/buy")
+    @PostMapping(value = "/buy", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public Mono<String> createOrder() {
         return orderService.createOrder()
                 .map(orderId -> "redirect:/orders/" + orderId + "?newOrder=true");
