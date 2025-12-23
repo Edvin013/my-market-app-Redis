@@ -300,101 +300,12 @@ api-specs/payment-service-api.yaml
 
 Генерация происходит автоматически при сборке проекта через `openapi-generator-maven-plugin`.
 
-## База данных
-
-### Схема БД
-
-**Таблица users:**
-- `id` - идентификатор пользователя
-- `username` - имя пользователя (уникальное)
-- `password` - зашифрованный пароль
-- `enabled` - активен ли пользователь
-
-**Таблица items:**
-- `id` - идентификатор товара
-- `title` - название
-- `description` - описание
-- `img_path` - путь к изображению
-- `price` - цена в копейках
-
-**Таблица cart_items:**
-- `id` - идентификатор записи
-- `user_id` - идентификатор пользователя (FK)
-- `item_id` - идентификатор товара (FK)
-- `count` - количество
-
-**Таблица orders:**
-- `id` - идентификатор заказа
-- `user_id` - идентификатор пользователя (FK)
-- `total_sum` - общая сумма заказа
-
-**Таблица order_items:**
-- `id` - идентификатор записи
-- `order_id` - идентификатор заказа (FK)
-- `item_id` - идентификатор товара (FK)
-- `count` - количество
-- `price` - цена на момент заказа
-
-## Конфигурация
-
-### Market App (application.properties)
-```properties
-# Порт сервера
-server.port=8080
-
-# PostgreSQL
-spring.r2dbc.url=r2dbc:postgresql://postgres:5432/marketdb
-spring.r2dbc.username=market
-spring.r2dbc.password=market
-
-# Redis
-spring.data.redis.host=redis
-spring.data.redis.port=6379
-
-# Кеш
-cache.item.ttl=120
-
-# Payment Service
-payment.service.url=http://payment-service:8081
-payment.service.timeout=5000
-
-# OAuth2 Client
-spring.security.oauth2.client.registration.market-app-client.provider=auth-server
-spring.security.oauth2.client.registration.market-app-client.client-id=market-app-client
-spring.security.oauth2.client.registration.market-app-client.client-secret=market-app-secret
-spring.security.oauth2.client.registration.market-app-client.authorization-grant-type=client_credentials
-spring.security.oauth2.client.registration.market-app-client.scope=payment.read,payment.write
-
-spring.security.oauth2.client.provider.auth-server.token-uri=http://auth-server:9000/oauth2/token
-```
-
-### Payment Service (application.properties)
-```properties
-# Порт сервера
-server.port=8081
-
-# Начальный баланс (в копейках)
-payment.initial-balance=1000000
-
-# OAuth2 Resource Server
-spring.security.oauth2.resourceserver.jwt.issuer-uri=http://auth-server:9000
-```
 
 ### Auth Server (application.properties)
 ```properties
 # Порт сервера
 server.port=9000
 ```
-
-## OAuth2 конфигурация
-
-### Зарегистрированные клиенты
-
-**market-app-client:**
-- **Client ID:** `market-app-client`
-- **Client Secret:** `market-app-secret`
-- **Grant Type:** `client_credentials`
-- **Scopes:** `payment.read`, `payment.write`
 
 ### Получение токена
 
@@ -410,51 +321,3 @@ curl -X POST http://localhost:9000/oauth2/token \
 curl -X GET "http://localhost:8081/api/v1/payments/balance?username=user" \
   -H "Authorization: Bearer {access_token}"
 ```
-
-## Проблемы и решения
-
-### Проблемы с портами
-Убедитесь, что порты не заняты:
-- 8080 - Market App
-- 8081 - Payment Service
-- 9000 - Auth Server
-- 5432 - PostgreSQL
-- 6379 - Redis
-
-### Проблемы с OAuth2
-- Убедитесь, что Auth Server запущен и доступен
-- Проверьте правильность client_id и client_secret
-- Проверьте, что issuer-uri указывает на правильный адрес
-
-### Проблемы с авторизацией пользователей
-- Пользователи создаются автоматически при первом запуске
-- Пароли хранятся в зашифрованном виде (BCrypt)
-- При проблемах с логином проверьте логи приложения
-
-## Архитектурные решения
-
-### Разделение ответственности
-- **Market App** - UI, бизнес-логика, управление пользователями
-- **Payment Service** - обработка платежей, управление балансами
-- **Auth Server** - выдача токенов для межсервисного взаимодействия
-
-### Безопасность
-- **Spring Security** для авторизации пользователей
-- **OAuth2 Client Credentials Flow** для межсервисного взаимодействия
-- **JWT токены** для stateless авторизации
-- **BCrypt** для шифрования паролей
-- **Разделение доступа** на уровне контроллеров и UI
-
-### Реактивное программирование
-- Все сервисы используют **Spring WebFlux**
-- **R2DBC** для реактивного доступа к БД
-- **Reactive Redis** для реактивного кеширования
-- **WebClient** для реактивных HTTP запросов
-
-## Лицензия
-
-Этот проект создан в учебных целях для Яндекс.Практикум.
-
-## Автор
-
-Проект разработан в рамках курса "Java-разработчик" от Яндекс.Практикум.

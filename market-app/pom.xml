@@ -159,6 +159,19 @@
                 <artifactId>maven-compiler-plugin</artifactId>
             </plugin>
 
+            <!-- Maven Surefire Plugin для запуска тестов с Java 21 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>
+                        -Djdk.attach.allowAttachSelf=true
+                        --add-opens java.base/java.lang=ALL-UNNAMED
+                        --add-opens java.base/java.util=ALL-UNNAMED
+                    </argLine>
+                </configuration>
+            </plugin>
+
             <!-- OpenAPI Generator для генерации клиента -->
             <plugin>
                 <groupId>org.openapitools</groupId>
@@ -215,4 +228,3 @@
         </plugins>
     </build>
 </project>
-
