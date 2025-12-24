@@ -25,53 +25,93 @@ public class CartServiceImpl implements CartService {
     @Override
     public Flux<ItemDto> getCartItems() {
         return userService.getCurrentUserId()
-                .flatMapMany(userId -> cartItemRepository.findByUserId(userId)
-                        .flatMap(cartItem ->
-                            itemRepository.findById(cartItem.getItemId())
-                                .map(item -> {
-                                    cartItem.setItem(item);
-                                    return itemDtoMapper.fromCartItem(cartItem);
-                                })
-                        )
-                );
+                .flatMapMany(this::getCartItemsForUser);
+    }
+
+    /**
+     * Получает товары из корзины пользователя
+     */
+    private Flux<ItemDto> getCartItemsForUser(Long userId) {
+        return cartItemRepository.findByUserId(userId)
+                .flatMap(this::enrichCartItemWithProduct);
+    }
+
+    /**
+     * Обогащает CartItem информацией о товаре и преобразует в DTO
+     */
+    private Mono<ItemDto> enrichCartItemWithProduct(CartItem cartItem) {
+        return itemRepository.findById(cartItem.getItemId())
+                .map(item -> {
+                    cartItem.setItem(item);
+                    return itemDtoMapper.fromCartItem(cartItem);
+                });
     }
 
     @Override
     public Mono<Long> getTotalPrice() {
         return userService.getCurrentUserId()
-                .flatMapMany(userId -> cartItemRepository.findByUserId(userId)
-                        .flatMap(cartItem ->
-                            itemRepository.findById(cartItem.getItemId())
-                                .map(item -> item.getPrice() * cartItem.getCount())
-                        )
-                )
+                .flatMapMany(this::calculateTotalPriceForUser)
                 .reduce(0L, Long::sum);
+    }
+
+    /**
+     * Вычисляет стоимость каждого товара в корзине пользователя
+     */
+    private Flux<Long> calculateTotalPriceForUser(Long userId) {
+        return cartItemRepository.findByUserId(userId)
+                .flatMap(this::calculateCartItemPrice);
+    }
+
+    /**
+     * Вычисляет стоимость одного товара в корзине
+     */
+    private Mono<Long> calculateCartItemPrice(CartItem cartItem) {
+        return itemRepository.findById(cartItem.getItemId())
+                .map(item -> item.getPrice() * cartItem.getCount());
     }
 
     @Override
     public Mono<Void> updateCartItem(Long itemId, ItemAction action) {
         return userService.getCurrentUserId()
-                .flatMap(userId -> 
-                    itemRepository.findById(itemId)
-                        .switchIfEmpty(Mono.error(new ItemNotFoundException(itemId)))
-                        .flatMap(item -> {
-                            Mono<CartItem> cartItemMono = cartItemRepository.findByUserIdAndItemId(userId, itemId);
-
-                            if (action == ItemAction.PLUS) {
-                                return plus(cartItemMono, userId, itemId);
-                            } else if (action == ItemAction.MINUS) {
-                                return minus(cartItemMono);
-                            } else if (action == ItemAction.DELETE) {
-                                return cartItemMono
-                                        .flatMap(cartItemRepository::delete)
-                                        .then();
-                            }
-                            return Mono.empty();
-                        })
-                );
+                .flatMap(userId -> updateCartItemForUser(userId, itemId, action));
     }
 
-    private Mono<Void> minus(Mono<CartItem> cartItemMono) {
+    /**
+     * Обновляет товар в корзине пользователя
+     */
+    private Mono<Void> updateCartItemForUser(Long userId, Long itemId, ItemAction action) {
+        return itemRepository.findById(itemId)
+                .switchIfEmpty(Mono.error(new ItemNotFoundException(itemId)))
+                .flatMap(item -> performCartAction(userId, itemId, action));
+    }
+
+    /**
+     * Выполняет действие с товаром в корзине
+     */
+    private Mono<Void> performCartAction(Long userId, Long itemId, ItemAction action) {
+        Mono<CartItem> cartItemMono = cartItemRepository.findByUserIdAndItemId(userId, itemId);
+
+        return switch (action) {
+            case PLUS -> incrementCartItem(cartItemMono, userId, itemId);
+            case MINUS -> decrementCartItem(cartItemMono);
+            case DELETE -> deleteCartItem(cartItemMono);
+            default -> Mono.empty();
+        };
+    }
+
+    /**
+     * Удаляет товар из корзины
+     */
+    private Mono<Void> deleteCartItem(Mono<CartItem> cartItemMono) {
+        return cartItemMono
+                .flatMap(cartItemRepository::delete)
+                .then();
+    }
+
+    /**
+     * Уменьшает количество товара в корзине или удаляет, если количество становится 0
+     */
+    private Mono<Void> decrementCartItem(Mono<CartItem> cartItemMono) {
         return cartItemMono
                 .flatMap(cartItem -> {
                     if (cartItem.getCount() > 1) {
@@ -84,14 +124,17 @@ public class CartServiceImpl implements CartService {
                 .then();
     }
 
-    private Mono<Void> plus(Mono<CartItem> cartItemMono, Long userId, Long itemId) {
+    /**
+     * Увеличивает количество товара в корзине или добавляет новый, если его еще нет
+     */
+    private Mono<Void> incrementCartItem(Mono<CartItem> cartItemMono, Long userId, Long itemId) {
         return cartItemMono
                 .flatMap(cartItem -> {
                     cartItem.setCount(cartItem.getCount() + 1);
                     return cartItemRepository.save(cartItem);
                 })
                 .switchIfEmpty(Mono.defer(() ->
-                    cartItemRepository.save(new CartItem(null, userId, itemId, null, 1))
+                        cartItemRepository.save(new CartItem(null, userId, itemId, null, 1))
                 ))
                 .then();
     }

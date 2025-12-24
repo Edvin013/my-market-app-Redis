@@ -1,11 +1,10 @@
 package ru.mirakyan.mymarket.payment.controller;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import ru.mirakyan.mymarket.payment.security.SecurityUtils;
 import ru.mirakyan.mymarket.payment.service.PaymentService;
 
 @Slf4j
@@ -20,60 +19,64 @@ public class PaymentController {
     }
 
     @GetMapping("/balance")
-    public Mono<ResponseEntity<BalanceResponse>> getBalance(@RequestParam String username) {
-        log.debug("REST: Получение баланса");
+    public Mono<ResponseEntity<BalanceResponse>> getBalance() {
+        log.debug("REST: Получение баланса из JWT токена");
 
-        if (username == null || username.isEmpty()) {
-            log.warn("REST: Не указан username");
-            return Mono.just(ResponseEntity.badRequest().build());
-        }
-
-        return paymentService.getBalance(username)
-                .map(balance -> {
-                    BalanceResponse response = new BalanceResponse();
-                    response.setBalance(balance);
-                    return ResponseEntity.ok(response);
+        return SecurityUtils.getCurrentUsername()
+                .flatMap(username -> {
+                    log.debug("REST: Запрос баланса для пользователя: {}", username);
+                    return paymentService.getBalance(username)
+                            .map(balance -> {
+                                BalanceResponse response = new BalanceResponse();
+                                response.setBalance(balance);
+                                log.info("REST: Баланс получен для {}: {}", username, balance);
+                                return ResponseEntity.ok(response);
+                            });
                 })
-                .doOnSuccess(resp -> log.debug("REST: Баланс получен для {}: {}", username, resp.getBody().getBalance()));
+                .onErrorResume(error -> {
+                    log.error("REST: Ошибка при получении баланса", error);
+                    return Mono.just(ResponseEntity.status(401).build());
+                });
     }
 
     @PostMapping("/process")
     public Mono<ResponseEntity<PaymentResponse>> processPayment(@RequestBody PaymentRequest paymentRequest) {
-        log.debug("REST: Обработка платежа");
+        log.debug("REST: Обработка платежа из JWT токена");
 
-        String username = paymentRequest.getUsername();
-        if (username == null || username.isEmpty()) {
-            log.warn("REST: Не указан username");
-            PaymentResponse errorResponse = new PaymentResponse();
-            errorResponse.setSuccess(false);
-            errorResponse.setMessage("Username обязателен");
-            return Mono.just(ResponseEntity.badRequest().body(errorResponse));
-        }
+        return SecurityUtils.getCurrentUsername()
+                .flatMap(username -> {
+                    log.debug("REST: Запрос на платеж для пользователя {}: сумма={}, orderId={}",
+                             username, paymentRequest.getAmount(), paymentRequest.getOrderId());
 
-        log.debug("REST: Запрос на платеж для {}: сумма={}, orderId={}",
-                 username, paymentRequest.getAmount(), paymentRequest.getOrderId());
+                    return paymentService.processPayment(
+                            username,
+                            paymentRequest.getAmount(),
+                            paymentRequest.getOrderId(),
+                            paymentRequest.getDescription()
+                    )
+                    .map(result -> {
+                        PaymentResponse response = new PaymentResponse();
+                        response.setSuccess(result.isSuccess());
+                        response.setTransactionId(result.getTransactionId());
+                        response.setRemainingBalance(result.getRemainingBalance());
+                        response.setMessage(result.getMessage());
 
-        return paymentService.processPayment(
-                username,
-                paymentRequest.getAmount(),
-                paymentRequest.getOrderId(),
-                paymentRequest.getDescription()
-        )
-        .map(result -> {
-            PaymentResponse response = new PaymentResponse();
-            response.setSuccess(result.isSuccess());
-            response.setTransactionId(result.getTransactionId());
-            response.setRemainingBalance(result.getRemainingBalance());
-            response.setMessage(result.getMessage());
-
-            if (result.isSuccess()) {
-                log.info("REST: Платеж успешно обработан для {}: {}", username, result.getTransactionId());
-                return ResponseEntity.ok(response);
-            } else {
-                log.warn("REST: Платеж не выполнен для {}: {}", username, result.getMessage());
-                return ResponseEntity.badRequest().body(response);
-            }
-        });
+                        if (result.isSuccess()) {
+                            log.info("REST: Платеж успешно обработан для {}: {}", username, result.getTransactionId());
+                            return ResponseEntity.ok(response);
+                        } else {
+                            log.warn("REST: Платеж не выполнен для {}: {}", username, result.getMessage());
+                            return ResponseEntity.badRequest().body(response);
+                        }
+                    });
+                })
+                .onErrorResume(error -> {
+                    log.error("REST: Ошибка при обработке платежа", error);
+                    PaymentResponse errorResponse = new PaymentResponse();
+                    errorResponse.setSuccess(false);
+                    errorResponse.setMessage("Ошибка аутентификации или обработки платежа");
+                    return Mono.just(ResponseEntity.status(401).body(errorResponse));
+                });
     }
 
     // DTO классы для десериализации ответов
@@ -90,18 +93,10 @@ public class PaymentController {
     }
 
     public static class PaymentRequest {
-        private String username;
+        // username больше не нужен - извлекается из JWT токена
         private Long amount;
         private Long orderId;
         private String description;
-
-        public String getUsername() {
-            return username;
-        }
-
-        public void setUsername(String username) {
-            this.username = username;
-        }
 
         public Long getAmount() {
             return amount;
