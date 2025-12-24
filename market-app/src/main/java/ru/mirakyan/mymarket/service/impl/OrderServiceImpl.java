@@ -17,6 +17,7 @@ import ru.mirakyan.mymarket.repository.OrderRepository;
 import ru.mirakyan.mymarket.service.CartService;
 import ru.mirakyan.mymarket.service.OrderService;
 import ru.mirakyan.mymarket.service.PaymentClient;
+import ru.mirakyan.mymarket.service.UserService;
 
 @Service
 @RequiredArgsConstructor
@@ -28,57 +29,107 @@ public class OrderServiceImpl implements OrderService {
     private final CartService cartService;
     private final ItemDtoMapper itemDtoMapper;
     private final PaymentClient paymentClient;
+    private final UserService userService;
 
     @Override
     public Mono<Long> createOrder() {
-        return cartItemRepository.findAll()
+        return userService.getCurrentUserId()
+                .flatMap(this::createOrderForUser);
+    }
+
+    /**
+     * Создает заказ для пользователя
+     */
+    private Mono<Long> createOrderForUser(Long userId) {
+        return cartItemRepository.findByUserId(userId)
                 .collectList()
-                .flatMap(cartItems -> {
-                    if (cartItems.isEmpty()) {
-                        return Mono.error(new EmptyCartException());
+                .flatMap(cartItems -> validateAndProcessOrder(userId, cartItems));
+    }
+
+    /**
+     * Валидирует корзину и обрабатывает заказ
+     */
+    private Mono<Long> validateAndProcessOrder(Long userId, java.util.List<ru.mirakyan.mymarket.model.CartItem> cartItems) {
+        if (cartItems.isEmpty()) {
+            return Mono.error(new EmptyCartException());
+        }
+
+        return calculateTotalPrice(cartItems)
+                .flatMap(totalSum -> processPaymentAndCreateOrder(userId, cartItems, totalSum));
+    }
+
+    /**
+     * Вычисляет общую стоимость заказа
+     */
+    private Mono<Long> calculateTotalPrice(java.util.List<ru.mirakyan.mymarket.model.CartItem> cartItems) {
+        return Flux.fromIterable(cartItems)
+                .flatMap(cartItem ->
+                        itemRepository.findById(cartItem.getItemId())
+                                .map(item -> item.getPrice() * cartItem.getCount())
+                )
+                .reduce(0L, Long::sum);
+    }
+
+    /**
+     * Обрабатывает платеж и создает заказ
+     */
+    private Mono<Long> processPaymentAndCreateOrder(Long userId, 
+                                                     java.util.List<ru.mirakyan.mymarket.model.CartItem> cartItems, 
+                                                     Long totalSum) {
+        return paymentClient.processPayment(totalSum, null, "Оплата заказа")
+                .flatMap(paymentSuccess -> {
+                    if (!paymentSuccess) {
+                        return Mono.error(new RuntimeException(
+                                "Не удалось обработать платеж. Недостаточно средств или сервис платежей недоступен."));
                     }
-
-                    return Flux.fromIterable(cartItems)
-                            .flatMap(cartItem ->
-                                    itemRepository.findById(cartItem.getItemId())
-                                            .map(item -> item.getPrice() * cartItem.getCount())
-                            )
-                            .reduce(0L, Long::sum)
-                            .flatMap(totalSum -> {
-                                return paymentClient.processPayment(totalSum, null, "Оплата заказа")
-                                        .flatMap(paymentSuccess -> {
-                                            if (!paymentSuccess) {
-                                                return Mono.error(new RuntimeException("Не удалось обработать платеж. Недостаточно средств или сервис платежей недоступен."));
-                                            }
-
-                                            Order order = new Order(totalSum);
-                                            return orderRepository.save(order)
-                                                    .flatMap(savedOrder ->
-                                                            Flux.fromIterable(cartItems)
-                                                                    .flatMap(cartItem ->
-                                                                            itemRepository.findById(cartItem.getItemId())
-                                                                                    .map(item -> new OrderItem(
-                                                                                            null,
-                                                                                            savedOrder.getId(),
-                                                                                            item.getId(),
-                                                                                            null,
-                                                                                            cartItem.getCount(),
-                                                                                            item.getPrice()
-                                                                                    ))
-                                                                    )
-                                                                    .flatMap(orderItemRepository::save)
-                                                                    .then(cartService.clearCart())
-                                                                    .thenReturn(savedOrder.getId())
-                                                    );
-                                        });
-                            });
+                    return createOrderWithItems(userId, cartItems, totalSum);
                 });
+    }
+
+    /**
+     * Создает заказ и добавляет в него товары
+     */
+    private Mono<Long> createOrderWithItems(Long userId, 
+                                            java.util.List<ru.mirakyan.mymarket.model.CartItem> cartItems, 
+                                            Long totalSum) {
+        Order order = new Order(userId, totalSum);
+        return orderRepository.save(order)
+                .flatMap(savedOrder -> saveOrderItemsAndClearCart(savedOrder, cartItems));
+    }
+
+    /**
+     * Сохраняет товары заказа и очищает корзину
+     */
+    private Mono<Long> saveOrderItemsAndClearCart(Order savedOrder, 
+                                                   java.util.List<ru.mirakyan.mymarket.model.CartItem> cartItems) {
+        return Flux.fromIterable(cartItems)
+                .flatMap(cartItem -> createOrderItem(savedOrder.getId(), cartItem))
+                .flatMap(orderItemRepository::save)
+                .then(cartService.clearCart())
+                .thenReturn(savedOrder.getId());
+    }
+
+    /**
+     * Создает OrderItem из CartItem
+     */
+    private Mono<OrderItem> createOrderItem(Long orderId, ru.mirakyan.mymarket.model.CartItem cartItem) {
+        return itemRepository.findById(cartItem.getItemId())
+                .map(item -> new OrderItem(
+                        null,
+                        orderId,
+                        item.getId(),
+                        null,
+                        cartItem.getCount(),
+                        item.getPrice()
+                ));
     }
 
     @Override
     public Flux<OrderDto> getAllOrders() {
-        return orderRepository.findAll()
-                .flatMap(this::convertToDto);
+        return userService.getCurrentUserId()
+                .flatMapMany(userId -> orderRepository.findByUserId(userId)
+                        .flatMap(this::convertToDto)
+                );
     }
 
     @Override

@@ -5,10 +5,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import ru.mirakyan.mymarket.model.Item;
+import ru.mirakyan.mymarket.model.User;
 import ru.mirakyan.mymarket.repository.ItemRepository;
+import ru.mirakyan.mymarket.repository.UserRepository;
 
 import java.util.Arrays;
 import java.util.List;
@@ -20,9 +23,38 @@ import java.util.List;
 public class DataInitializer implements ApplicationRunner {
 
     private final ItemRepository itemRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public void run(ApplicationArguments args) {
+        initializeUsers();
+        initializeItems();
+    }
+    
+    private void initializeUsers() {
+        List<User> users = Arrays.asList(
+            new User(null, "user", passwordEncoder.encode("password"), true),
+            new User(null, "admin", passwordEncoder.encode("admin123"), true),
+            new User(null, "test", passwordEncoder.encode("test"), true)
+        );
+        
+        userRepository.count()
+            .flatMapMany(count -> {
+                if (count == 0) {
+                    log.info("Инициализация базы данных пользователями...");
+                    return Flux.fromIterable(users)
+                        .flatMap(userRepository::save)
+                        .doOnComplete(() -> log.info("Пользователи инициализированы успешно"));
+                } else {
+                    log.info("База данных уже содержит {} пользователей", count);
+                    return Flux.empty();
+                }
+            })
+            .subscribe();
+    }
+    
+    private void initializeItems() {
         List<Item> items = Arrays.asList(
             new Item(null, "Футбольный мяч", "Профессиональный футбольный мяч размер 5", "/images/ball.jpg", 2500L),
             new Item(null, "Баскетбольный мяч", "Баскетбольный мяч для игры в зале", "/images/basketball.jpg", 3000L),
@@ -47,7 +79,7 @@ public class DataInitializer implements ApplicationRunner {
                     log.info("Инициализация базы данных товарами...");
                     return Flux.fromIterable(items)
                         .flatMap(itemRepository::save)
-                        .doOnComplete(() -> log.info("База данных инициализирована успешно"));
+                        .doOnComplete(() -> log.info("База данных товарами инициализирована успешно"));
                 } else {
                     log.info("База данных уже содержит {} товаров", count);
                     return Flux.empty();

@@ -3,8 +3,8 @@ package ru.mirakyan.mymarket.payment.service;
 import reactor.core.publisher.Mono;
 
 public interface PaymentService {
-    Mono<Long> getBalance();
+    Mono<Long> getBalance(String username);
 
-    Mono<PaymentResult> processPayment(Long amount, Long orderId, String description);
+    Mono<PaymentResult> processPayment(String username, Long amount, Long orderId, String description);
 }
 

@@ -3,7 +3,7 @@ FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
 # Копируем JAR файл
-COPY target/my-market-app-*.jar app.jar
+COPY market-app/target/market-app-*.jar app.jar
 
 # Открываем порт 8080
 EXPOSE 8080

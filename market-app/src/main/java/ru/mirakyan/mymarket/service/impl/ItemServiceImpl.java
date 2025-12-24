@@ -73,12 +73,13 @@ public class ItemServiceImpl implements ItemService {
                         .flatMap(itemCacheService::saveItemToCache)
                 )
                 .switchIfEmpty(Mono.error(new ItemNotFoundException(id)))
-                .flatMap(item ->
-                    cartItemRepository.findByItemId(id)
-                        .map(CartItem::getCount)
-                        .defaultIfEmpty(0)
-                        .map(count -> itemDtoMapper.fromItem(item, count))
-                );
+                .zipWith(getCartCounts())
+                .map(tuple -> {
+                    Item item = tuple.getT1();
+                    Map<Long, Integer> cartCounts = tuple.getT2();
+                    int count = cartCounts.getOrDefault(id, 0);
+                    return itemDtoMapper.fromItem(item, count);
+                });
     }
 
     @Override

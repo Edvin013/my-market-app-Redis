@@ -1,6 +1,5 @@
 package ru.mirakyan.mymarket.model;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -16,10 +15,12 @@ import java.util.List;
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
 public class Order {
     @Id
     private Long id;
+
+    @Column("user_id")
+    private Long userId;
 
     @Transient
     private List<OrderItem> items = new ArrayList<>();
@@ -27,7 +28,9 @@ public class Order {
     @Column("total_sum")
     private Long totalSum;
 
-    public Order(Long totalSum) {
+    public Order(Long userId, Long totalSum) {
+        this.userId = userId;
         this.totalSum = totalSum;
+        this.items = new ArrayList<>();
     }
 }

@@ -21,14 +21,14 @@ public class PaymentClientImpl implements PaymentClient {
 
     @Override
     public Mono<Long> getBalance() {
-        log.debug("Запрос баланса из сервиса платежей");
+        log.debug("Запрос баланса из сервиса платежей (username извлекается из JWT)");
 
         return paymentWebClient.get()
                 .uri("/api/v1/payments/balance")
                 .retrieve()
                 .bodyToMono(BalanceResponse.class)
                 .map(BalanceResponse::getBalance)
-                .doOnSuccess(balance -> log.info("Баланс получен: {}", balance))
+                .doOnSuccess(balance -> log.info("Баланс получен из Payment Service: {}", balance))
                 .doOnError(error -> log.error("Ошибка при получении баланса из сервиса платежей", error))
                 .onErrorResume(error -> {
                     log.warn("Сервис платежей недоступен, возвращается баланс 0");
@@ -38,9 +38,10 @@ public class PaymentClientImpl implements PaymentClient {
 
     @Override
     public Mono<Boolean> processPayment(Long amount, Long orderId, String description) {
-        log.debug("Обработка платежа: сумма={}, orderId={}", amount, orderId);
+        log.debug("Обработка платежа: сумма={}, orderId={} (username извлекается из JWT)", amount, orderId);
 
         Map<String, Object> request = new HashMap<>();
+        // username больше не передаем - он извлекается из JWT токена в Payment Service
         request.put("amount", amount);
         request.put("orderId", orderId);
         request.put("description", description);
@@ -54,9 +55,9 @@ public class PaymentClientImpl implements PaymentClient {
                 .map(PaymentResponse::isSuccess)
                 .doOnSuccess(success -> {
                     if (success) {
-                        log.info("Платеж успешно обработан: orderId={}", orderId);
+                        log.info("Платеж успешно обработан в Payment Service: orderId={}", orderId);
                     } else {
-                        log.warn("Платеж не выполнен: orderId={}", orderId);
+                        log.warn("Платеж не выполнен в Payment Service: orderId={}", orderId);
                     }
                 })
                 .doOnError(error -> log.error("Ошибка при обработке платежа: orderId={}", orderId, error))
